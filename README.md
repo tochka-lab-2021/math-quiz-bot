@@ -1,4 +1,8 @@
 # math-quiz-bot
 Telegram bot for math quiz
 
-Anton F
+# Authors
+
+- Ivan Mikheykin
+- Anton Lagun adds the branch and wins
+- Anton F
