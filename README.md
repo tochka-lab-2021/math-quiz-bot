@@ -5,3 +5,5 @@ Telegram bot for math quiz
 
 - Ivan Mikheykin
 - Anton Lagun adds the branch and wins
+
+Anton F
