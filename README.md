@@ -1,6 +1,8 @@
 # math-quiz-bot
 Telegram bot for math quiz
 
+![chat with bot](math-bot.gif)
+
 # Authors
 
 - Ivan Mikheykin

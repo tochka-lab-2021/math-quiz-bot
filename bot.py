@@ -2,40 +2,10 @@
 
 import random
 import telebot
+from telebot import types
+
 from task import Task
 from state import State
-
-
-# Call on "next" button press
-def on_next(user_state):
-    task = gen_task()
-    user_state.task = task.task
-    user_state.answer = task.answer
-
-
-def detect_response(user_state, text):
-    result = False
-    if text == user_state.answer:
-        result = True
-
-    if result:
-        positive_response(user_state)
-    else:
-        negative_response(user_state)
-
-    return result
-
-
-def negative_response(user_state):
-    user_state.negative_tries += 1
-    if user_state.negative_tries >= 2:
-        return "Oops + button"
-    return "Oops"
-
-
-def positive_response():
-    user_state.negative_tries = 0
-    return "OK!"
 
 
 def gen_task():
@@ -63,44 +33,104 @@ def save_user_state(user_state):
     state_storage[user_state.user_id] = user_state
 
 
+def new_task_markup():
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    gave_up_btn = types.InlineKeyboardButton('Новая задача', callback_data="give_up")
+    markup.add(gave_up_btn)
+    return markup
+
+
+def remove_reply_markup(chat_id, state, new_msg):
+    if state.message_with_inline_keyboard_id is not None:
+        bot.edit_message_reply_markup(chat_id, state.message_with_inline_keyboard_id, reply_markup=None)
+    # Save message_id from new message to remove a keyboard in the future.
+    state.message_with_inline_keyboard_id = None
+    if new_msg is not None:
+        state.message_with_inline_keyboard_id = new_msg.message_id
+
+
 # Start Bot
 f = open("token.txt", "r")
 token = f.read()
 bot = telebot.TeleBot(token, parse_mode=None)
 
 
-@bot.message_handler(commands=['start', 'help'])
+@bot.message_handler(commands=['help'])
+def on_help(message):
+    bot.reply_to(message, "Чтобы начать викторину, нажми кнопку 'Новая задача' или отправь любое сообщение.")
+
+
+@bot.message_handler(commands=['start'])
 def on_start(message):
-    bot.reply_to(message, "Привет! Давай порешаем примеры?")
+    # Load user state
+    user_id = message.from_user.id
+    state = get_user_state(user_id)
+    if state.task is None:
+        # Send welcome message with inline keyboard.
+        start_msg = bot.send_message(message.chat.id, "Привет! Давай порешаем задачки?", reply_markup=new_task_markup())
+        # remove keyboard from earlier message
+        remove_reply_markup(message.chat.id, state, start_msg)
+        save_user_state(state)
+    else:
+        bot.reply_to(message, f"Задана задача:\n{state.task.task}")
 
 
-@bot.message_handler(func=lambda m: True)
+# Handle all messages with all content_type
+@bot.message_handler(func=lambda m: True, content_types=telebot.util.content_type_media)
 def on_all(message):
     user_id = message.from_user.id
-
     state = get_user_state(user_id)
 
-    if state.task == None:
+    if state.task is None:
         # Generate new task, show to user.
         task = gen_task()
         state.task = task
         state.tries = 0
         state.user_id = user_id
-        save_user_state(state)
         bot.send_message(message.chat.id, task.task)
+        # remove keyboard from earlier message
+        remove_reply_markup(message.chat.id, state, None)
+        save_user_state(state)
     else:
         # Check answer
         if message.text == state.task.answer:
-            bot.send_message(message.chat.id, f"И правда, {state.task.task}={message.text}. Ещё пример?")
+            msg = bot.send_message(message.chat.id, f"И правда, {state.task.task}={message.text}. Продолжим?", reply_markup=new_task_markup())
+            # remove keyboard from earlier message
+            remove_reply_markup(message.chat.id, state, msg)
             state.task = None
             state.tries = 0
             state.user_id = user_id
             save_user_state(state)
         else:
+            wrong_msg = bot.send_message(message.chat.id, "Неверный ответ, попробуйте ещё раз.", reply_markup=new_task_markup())
+            # remove keyboard from earlier message
+            remove_reply_markup(message.chat.id, state, wrong_msg)
+            save_user_state(state)
 
-            bot.send_message(message.chat.id, "Это ответ?")
 
+# Handle inline keyboard button clicks
+@bot.callback_query_handler(func=lambda call: True)
+def inline_handler(call):
+    if call.data != "give_up":
+        return
+    bot.answer_callback_query(call.id)
 
+    user_id = call.from_user.id
+    state = get_user_state(user_id)
+    # Generate new task and show to user.
+    task = gen_task()
+    state.task = task
+    state.tries = 0
+    state.user_id = user_id
+    bot.send_message(call.message.chat.id, task.task)
+
+    # Remove button from saved message id.
+    if state.message_with_inline_keyboard_id != call.message.message_id:
+        remove_reply_markup(call.message.chat.id, state, None)
+    # Remove clicked button.
+    bot.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=None)
+    state.message_with_inline_keyboard_id = None
+    save_user_state(state)
 
 
 if __name__ == "__main__":
