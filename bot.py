@@ -1,5 +1,8 @@
 #!/usr/bin/env python3
 
+import random
+
+
 def main():
     task = gen_task()
     print(task)
@@ -24,9 +27,9 @@ def positive_response():
 
 def gen_task():
     # gen 1st number
-    a = 1
+    a= random.randrange(1, 9, 1)
     # gen 2nd number
-    b = 4
+    b = random.randrange(1, 9, 1)
     return f"{a}x{b}"
 
 
