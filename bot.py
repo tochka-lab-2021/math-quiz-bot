@@ -13,10 +13,6 @@ def on_next(user_state):
     user_state.answer = task.answer
 
 
-def user_state(user_id):
-    return ""
-
-
 def detect_response(user_state, text):
     result = False
     if text == user_state.answer:
@@ -54,13 +50,18 @@ def gen_task():
     return t
 
 
-def get_user_state(user_id):
+state_storage = {}
 
+
+def get_user_state(user_id):
+    if user_id in state_storage:
+        return state_storage[user_id]
     return State()
 
 
 def save_user_state(user_state):
-    return None
+    state_storage[user_state.user_id] = user_state
+
 
 # Start Bot
 f = open("token.txt", "r")
@@ -89,7 +90,17 @@ def on_all(message):
         bot.send_message(message.chat.id, task.task)
     else:
         # Check answer
-        bot.send_message(message.chat.id, "Это ответ?")
+        if message.text == state.task.answer:
+            bot.send_message(message.chat.id, f"И правда, {state.task.task}={message.text}. Ещё пример?")
+            state.task = None
+            state.tries = 0
+            state.user_id = user_id
+            save_user_state(state)
+        else:
+
+            bot.send_message(message.chat.id, "Это ответ?")
+
+
 
 
 if __name__ == "__main__":
