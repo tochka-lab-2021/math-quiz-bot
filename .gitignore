@@ -5,6 +5,7 @@ __pycache__/
 
 .idea
 token.txt
+db.txt
 
 # C extensions
 *.so
