@@ -1,0 +1,60 @@
+<html>
+<head>
+    <title>Math quiz ladder</title>
+    <style>
+.ladder-table{
+    display: table;
+    margin: 0 auto;
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.ladder-header-group{
+    display: table-header-group;
+}
+.ladder-header-row{
+    display: table-row;
+    border: 2px solid red;
+}
+
+.ladder-row{
+    display: table-row;
+}
+
+.ladder-cell{
+    display: table-cell;
+    padding: 5px;
+}
+
+
+    </style>
+</head>
+<body>
+
+<h2>Ladder</h2>
+
+<div class="ladder-table">
+    <div class="ladder-header-group">
+        <div class="ladder-header-row">
+            <div class="ladder-cell">rank</div>
+            <div class="ladder-cell">user</div>
+            <div class="ladder-cell">success</div>
+        </div>
+    </div>
+    {% for rank in ladder %}
+    <div class="ladder-row">
+        <div class="ladder-cell">
+            {{ rank.rank }}
+        </div>
+        <div class="ladder-cell">
+            {{ rank.user }}
+        </div>
+        <div class="ladder-cell">
+            {{ rank.success }}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+</body>
+</html>
