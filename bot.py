@@ -3,6 +3,7 @@
 import random
 import telebot
 from telebot import types
+import psycopg2
 
 from task import Task
 from state import State
@@ -16,20 +17,96 @@ def gen_task():
 
     t = Task()
     t.task = f"{a}x{b}"
-    t.answer = f"{a*b}"
+    t.answer = f"{a * b}"
     return t
 
+
+conn = None
 
 state_storage = {}
 
 
 def get_user_state(user_id):
+    """
+    Get state from database or return fresh state if no records for the user.
+
+    :param user_id: Unique identifier for user
+    :return: State
+    """
+    cur = conn.cursor()
+    cur.execute("""
+        SELECT
+            user_id, task, answer, tries
+        FROM
+            state 
+        WHERE
+            user_id=%s
+        """,
+        (user_id,))
+    row = cur.fetchone()
+    cur.close()
+    if row is None:
+        s = State()
+        s.new = True
+        return s
+
+    t = None
+    if row[1] is not None:
+        t = Task()
+        t.task = row[1]
+        t.answer = row[2]
+
+    s = State()
+    s.user_id = row[0]
+    s.task = t
+    s.tries = row[3]
+
     if user_id in state_storage:
-        return state_storage[user_id]
-    return State()
+        s.message_with_inline_keyboard_id = state_storage[user_id].message_with_inline_keyboard_id
+
+    return s
 
 
 def save_user_state(user_state):
+    """
+    Insert a new state in the database or update an existing record.
+    :param user_state:
+    :return:
+    """
+
+    task = Task()
+    task.task = None
+    task.answer = None
+    if user_state.task is not None:
+        task = user_state.task
+
+    if user_state.new:
+        # insert
+        cur = conn.cursor()
+        cur.execute("""
+        INSERT INTO
+           state
+        VALUES
+            (%s, %s, %s, %s)
+        """,
+            (user_state.user_id, task.task, task.answer, user_state.tries))
+    else:
+        # update
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE state
+            SET
+              task=%s,
+              answer=%s,
+              tries=%s
+            WHERE
+              user_id=%s
+        """,
+            (task.task, task.answer, user_state.tries, user_state.user_id))
+    # Save to database
+    conn.commit()
+    cur.close()
+    # Save to local storage
     state_storage[user_state.user_id] = user_state
 
 
@@ -94,7 +171,8 @@ def on_all(message):
     else:
         # Check answer
         if message.text == state.task.answer:
-            msg = bot.send_message(message.chat.id, f"И правда, {state.task.task}={message.text}. Продолжим?", reply_markup=new_task_markup())
+            msg = bot.send_message(message.chat.id, f"И правда, {state.task.task}={message.text}. Продолжим?",
+                                   reply_markup=new_task_markup())
             # remove keyboard from earlier message
             remove_reply_markup(message.chat.id, state, msg)
             state.task = None
@@ -102,7 +180,8 @@ def on_all(message):
             state.user_id = user_id
             save_user_state(state)
         else:
-            wrong_msg = bot.send_message(message.chat.id, "Неверный ответ, попробуйте ещё раз.", reply_markup=new_task_markup())
+            wrong_msg = bot.send_message(message.chat.id, "Неверный ответ, попробуйте ещё раз.",
+                                         reply_markup=new_task_markup())
             # remove keyboard from earlier message
             remove_reply_markup(message.chat.id, state, wrong_msg)
             save_user_state(state)
@@ -134,4 +213,16 @@ def inline_handler(call):
 
 
 if __name__ == "__main__":
+    # Open db connection
+    f = open("db.txt", "r")
+    db_conn = f.read()
+    conn = psycopg2.connect(db_conn)
+
+    # Test connection
+    tcur = conn.cursor()
+    tcur.execute("SELECT count(1) FROM state;")
+    print("{0} users in database.".format(tcur.fetchone()[0]))
+    tcur.close()
+
+    # Start bot loop.
     bot.polling()

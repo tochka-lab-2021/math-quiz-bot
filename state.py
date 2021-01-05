@@ -7,3 +7,5 @@ class State:
     tries = 0
     # start message with inline keyboard
     message_with_inline_keyboard_id = None
+    # new user observed
+    new = False
