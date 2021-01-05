@@ -5,3 +5,5 @@ class State:
     task = None
     #
     tries = 0
+    # start message with inline keyboard
+    message_with_inline_keyboard_id = None
